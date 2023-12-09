@@ -1,0 +1,14 @@
+{
+  "name": "screen-scout",
+  "version": "0.1.0",
+  "description": "automate the process of capturing screenshots of web pages",
+  "main": "screenshot.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "puppeteer": "^21.6.0"
+  }
+}
