@@ -47,6 +47,12 @@ const argv = yargs(hideBin(process.argv))
     type: 'number',
     default: 10
   })
+  .option('followExternal', {
+    alias: 'f',
+    describe: 'Whether to follow external links',
+    type: 'boolean',
+    default: false
+  })
   .help()
   .alias('help', 'h')
   .version()
@@ -73,17 +79,31 @@ function getFilenameFromUrl(targetUrl, fileType) {
 }
 
 /**
- * Finds and returns all HTTP/HTTPS links on the given page.
+ * Finds and returns filtered HTTP/HTTPS links on the given page.
  * 
  * @param {object} page - The Puppeteer page object.
+ * @param {string} base - The base URL of the current page.
+ * @param {boolean} followExternal - Whether to include external links.
  * @return {Promise<Array<string>>} A promise that resolves to an array of link URLs.
  */
-async function findLinks(page) {
-  return await page.evaluate(() => {
+async function findLinks(page, base, followExternal) {
+  return await page.evaluate(({ base, followExternal }) => {
     const links = Array.from(document.querySelectorAll('a'));
-    console.log(`Found ${links.length} links on the page.`);
-    return links.map(link => link.href).filter(href => href.startsWith('http'));
-  });
+    let uniqueLinks = new Set();
+
+    links.forEach(link => {
+      let href = link.href;
+      if (href.startsWith('http')) {
+        // Check if the link is external
+        const isExternal = !href.startsWith(base);
+        if (followExternal || !isExternal) {
+          uniqueLinks.add(href);
+        }
+      }
+    });
+
+    return Array.from(uniqueLinks);
+  }, { base, followExternal });
 }
 
 /**
@@ -97,9 +117,9 @@ async function findLinks(page) {
  * @param {number} maxPages - The maximum number of pages to capture.
  * @param {Set<string>} [visited=new Set()] - A set of already visited URLs.
  * @param {number} [currentDepth=1] - The current depth of recursion.
+ * @param {boolean} followExternal - Whether to follow external links.
  */
-async function takeScreenshots(targetUrl, resolution, outputDir, fileType, depth, maxPages, visited = new Set(), currentDepth = 1) {
-  // Check if the maximum page count or depth has been reached
+async function takeScreenshots(targetUrl, resolution, outputDir, fileType, depth, maxPages, followExternal, visited = new Set(), currentDepth = 1) {
   if (visited.size >= maxPages || currentDepth > depth) {
     return;
   }
@@ -123,29 +143,30 @@ async function takeScreenshots(targetUrl, resolution, outputDir, fileType, depth
 
     console.log(`Screenshot saved to ${outputPath}`);
 
-    // Recurse through links found on the page if the current depth allows
     if (currentDepth < depth) {
-      const links = await findLinks(page);
+      const base = new URL(targetUrl).origin;
+      const links = await findLinks(page, base, followExternal);
       for (const link of links) {
         if (!visited.has(link)) {
-          await takeScreenshots(link, resolution, outputDir, fileType, depth, maxPages, visited, currentDepth + 1);
+          await takeScreenshots(link, resolution, outputDir, fileType, depth, maxPages, followExternal, visited, currentDepth + 1);
         }
       }
     }
 
     await browser.close();
   } catch (error) {
-    // Log the error and continue with the next URL
     console.error(`Error processing ${targetUrl}:`, error);
   }
 }
 
+
 // --------------------------------------------------------------- //
 
 
 // --------------------------------------------------------------- //
+// Main script execution
 if (argv.url) {
-  takeScreenshots(argv.url, argv.resolution, argv.output, argv.type, argv.depth, argv.maxPages)
+  takeScreenshots(argv.url, argv.resolution, argv.output, argv.type, argv.depth, argv.maxPages, argv.followExternal)
     .then(() => console.log('Completed capturing screenshots.'))
     .catch(err => console.error('Error during screenshot capture:', err));
 } else {
