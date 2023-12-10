@@ -85,7 +85,6 @@ async function findLinks(page) {
     return links.map(link => link.href).filter(href => href.startsWith('http'));
   });
 }
-// --------------------------------------------------------------- //
 
 /**
  * Recursively takes screenshots of the given URL and any discovered links up to the specified depth.
@@ -100,39 +99,47 @@ async function findLinks(page) {
  * @param {number} [currentDepth=1] - The current depth of recursion.
  */
 async function takeScreenshots(targetUrl, resolution, outputDir, fileType, depth, maxPages, visited = new Set(), currentDepth = 1) {
+  // Check if the maximum page count or depth has been reached
   if (visited.size >= maxPages || currentDepth > depth) {
     return;
   }
 
-  visited.add(targetUrl);
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
-  const [width, height] = resolution.split('x').map(dim => parseInt(dim, 10));
-  await page.setViewport({ width, height });
-  await page.goto(targetUrl, { waitUntil: 'networkidle2' });
+  try {
+    visited.add(targetUrl);
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+    const [width, height] = resolution.split('x').map(dim => parseInt(dim, 10));
+    await page.setViewport({ width, height });
+    await page.goto(targetUrl, { waitUntil: 'networkidle2' });
 
-  const filename = getFilenameFromUrl(targetUrl, fileType === 'pdf' ? 'pdf' : fileType);
-  const outputPath = path.join(outputDir, filename);
+    const filename = getFilenameFromUrl(targetUrl, fileType === 'pdf' ? 'pdf' : fileType);
+    const outputPath = path.join(outputDir, filename);
 
-  if (fileType === 'pdf') {
-    await page.pdf({ path: outputPath, format: 'A4' });
-  } else {
-    await page.screenshot({ path: outputPath, type: fileType === 'jpeg' ? 'jpeg' : fileType });
-  }
+    if (fileType === 'pdf') {
+      await page.pdf({ path: outputPath, format: 'A4' });
+    } else {
+      await page.screenshot({ path: outputPath, type: fileType === 'jpeg' ? 'jpeg' : fileType });
+    }
 
-  console.log(`Screenshot saved to ${outputPath}`);
+    console.log(`Screenshot saved to ${outputPath}`);
 
-  if (currentDepth < depth) {
-    const links = await findLinks(page);
-    for (const link of links) {
-      if (!visited.has(link)) {
-        await takeScreenshots(link, resolution, outputDir, fileType, depth, maxPages, visited, currentDepth + 1);
+    // Recurse through links found on the page if the current depth allows
+    if (currentDepth < depth) {
+      const links = await findLinks(page);
+      for (const link of links) {
+        if (!visited.has(link)) {
+          await takeScreenshots(link, resolution, outputDir, fileType, depth, maxPages, visited, currentDepth + 1);
+        }
       }
     }
-  }
 
-  await browser.close();
+    await browser.close();
+  } catch (error) {
+    // Log the error and continue with the next URL
+    console.error(`Error processing ${targetUrl}:`, error);
+  }
 }
+
 // --------------------------------------------------------------- //
 
 
