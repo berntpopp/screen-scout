@@ -1,7 +1,9 @@
 
 # Screen-Scout
 
-Screen-Scout is an advanced Node.js tool for capturing screenshots of web pages and their linked pages. It's built on top of Puppeteer and allows users to recursively capture screenshots of a web page and all linked pages within specified depth and page limits.
+![screen-scout_logo](static/img/screen-scout_logo.png)
+
+Screen-Scout is a tool for capturing screenshots of web pages and their linked pages. It's built on top of Puppeteer and allows users to recursively capture screenshots of a web page and all linked pages within specified depth and page limits.
 
 ## Features
 
